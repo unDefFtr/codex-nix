@@ -16,8 +16,8 @@ PACKAGE_NIX="${SCRIPT_DIR}/../package.nix"
 PLATFORMS=(
   "aarch64-apple-darwin"
   "x86_64-apple-darwin"
-  "x86_64-unknown-linux-gnu"
-  "aarch64-unknown-linux-gnu"
+  "x86_64-unknown-linux-musl"
+  "aarch64-unknown-linux-musl"
 )
 
 current_version() {
@@ -60,28 +60,71 @@ echo "Updating to:     ${NEW_VERSION}"
 echo ""
 
 echo "Fetching SHA256 hashes..."
+hashes_file=""
+updated_package=""
+cleanup() {
+  [[ -z "$hashes_file" ]] || rm -f -- "$hashes_file"
+  [[ -z "$updated_package" ]] || rm -f -- "$updated_package"
+}
+trap cleanup EXIT
+
+hashes_file=$(mktemp)
+updated_package=$(mktemp "${PACKAGE_NIX}.tmp.XXXXXX")
+
 for platform in "${PLATFORMS[@]}"; do
-  hash=$(nix-prefetch-url \
-    "https://github.com/${REPO}/releases/download/rust-v${NEW_VERSION}/codex-${platform}.tar.gz" \
-    2>/dev/null | tail -1)
+  url="https://github.com/${REPO}/releases/download/rust-v${NEW_VERSION}/codex-${platform}.tar.gz"
+  if ! hash=$(nix-prefetch-url "$url" | tail -1); then
+    echo "Failed to fetch ${platform} from ${url}" >&2
+    exit 1
+  fi
+
+  if [[ -z "$hash" || "$hash" == *[[:space:]]* ]]; then
+    echo "Invalid hash returned for ${platform}: ${hash}" >&2
+    exit 1
+  fi
 
   echo "  ${platform}: ${hash}"
-
-  tmp=$(mktemp)
-  awk -v platform="$platform" -v hash="$hash" '
-    /hashes = \{/ { in_block=1 }
-    in_block && $0 ~ "\"" platform "\"" {
-      sub(/= "[^"]*"/, "= \"" hash "\"")
-    }
-    in_block && /\};/ { in_block=0 }
-    { print }
-  ' "$PACKAGE_NIX" > "$tmp"
-  mv "$tmp" "$PACKAGE_NIX"
+  printf '%s\t%s\n' "$platform" "$hash" >> "$hashes_file"
 done
 
-tmp=$(mktemp)
-sed "s/version = \"${CURRENT}\"/version = \"${NEW_VERSION}\"/" "$PACKAGE_NIX" > "$tmp"
-mv "$tmp" "$PACKAGE_NIX"
+awk -F '\t' -v new_version="$NEW_VERSION" '
+  NR == FNR {
+    hashes[$1] = $2
+    next
+  }
+  /^[[:space:]]*version = "/ && !version_updated {
+    sub(/version = "[^"]*"/, "version = \"" new_version "\"")
+    version_updated = 1
+  }
+  /hashes = \{/ { in_block=1 }
+  in_block {
+    for (platform in hashes) {
+      if ($0 ~ "\"" platform "\"") {
+        sub(/= "[^"]*"/, "= \"" hashes[platform] "\"")
+        updated[platform] = 1
+        break
+      }
+    }
+  }
+  in_block && /\};/ { in_block=0 }
+  { print }
+  END {
+    if (!version_updated) {
+      print "Could not find version in package.nix" > "/dev/stderr"
+      failed = 1
+    }
+    for (platform in hashes) {
+      if (!updated[platform]) {
+        print "Could not find hash entry for " platform " in package.nix" > "/dev/stderr"
+        failed = 1
+      }
+    }
+    exit failed
+  }
+' "$hashes_file" "$PACKAGE_NIX" > "$updated_package"
+
+mv "$updated_package" "$PACKAGE_NIX"
+updated_package=""
 
 echo ""
 echo "Updated package.nix to v${NEW_VERSION}"

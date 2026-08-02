@@ -17,7 +17,7 @@ jobs:
   check-update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -34,12 +34,13 @@ jobs:
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           CURRENT_VERSION=$(grep 'version = "' package.nix | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo "Current version: $CURRENT_VERSION"
 
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            LATEST_VERSION="${{ github.event.inputs.version }}"
+          if [ -n "$REQUESTED_VERSION" ]; then
+            LATEST_VERSION="$REQUESTED_VERSION"
           else
             LATEST_VERSION=$(gh release view --repo openai/codex --json tagName -q '.tagName' | sed 's/^rust-v//')
           fi
@@ -56,7 +57,9 @@ jobs:
 
       - name: Update version and hashes
         if: steps.check.outputs.update_needed == 'true'
-        run: bash ./scripts/update.sh "${{ steps.check.outputs.new_version }}"
+        env:
+          UPDATE_VERSION: ${{ steps.check.outputs.new_version }}
+        run: bash ./scripts/update.sh "$UPDATE_VERSION"
 
       - name: Verify build
         if: steps.check.outputs.update_needed == 'true'
@@ -65,7 +68,7 @@ jobs:
       - name: Create Pull Request
         if: steps.check.outputs.update_needed == 'true'
         id: create-pr
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "update codex to ${{ steps.check.outputs.new_version }}"

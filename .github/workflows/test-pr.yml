@@ -6,6 +6,7 @@ on:
       - "package.nix"
       - "flake.nix"
       - "flake.lock"
+      - "scripts/**"
       - ".github/workflows/**"
 
 jobs:
@@ -15,7 +16,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - name: Check update script syntax
+        run: bash -n ./scripts/update.sh
 
       - uses: cachix/install-nix-action@v31
         with:
