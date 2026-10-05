@@ -9,7 +9,7 @@
 }:
 
 let
-  version = "0.160.0";
+  version = "0.160.1";
   repo = "openai/codex";
 
   platformMap = {
@@ -20,10 +20,10 @@ let
   };
 
   hashes = {
-    "x86_64-unknown-linux-musl" = "04sasikwpb73ban91lxdb7hy2hbza8592ljqg0kskrsfgm0nas1h";
-    "aarch64-unknown-linux-musl" = "1mz9xl22m95b20f7nydviqw23x6pl63vm59cl7jpgxi5k49j0dl8";
-    "x86_64-apple-darwin" = "1gszh9kz1fizfxqj1kw47ivvralmamisnsvv5zfvi0afdrh10355";
-    "aarch64-apple-darwin" = "0pabi623gnaj0rfi5f19z9yfjdysil9m6brl2l8pk3va6z5cghq7";
+    "x86_64-unknown-linux-musl" = "0gx3pf28r26k16dypxrrbvj63ak3vcpka2klgxz8zlcjwldmh9lj";
+    "aarch64-unknown-linux-musl" = "1xz1yyc5bp3kvrs41851qm92zc1wdwak3am33ps5ni22422wakgm";
+    "x86_64-apple-darwin" = "1drdy1xblzr2lak04cs61skmlk2ixn26jq7i8lflnhn4jgdqv4wd";
+    "aarch64-apple-darwin" = "1l4496a5334mv0fh0xbil09ks0y561gkinnpfkxmmjfr96qg42k7";
   };
 
   platform = platformMap.${stdenv.hostPlatform.system}
